@@ -1,13 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-import { throwError } from 'rxjs';
-import { catchError, tap, map } from 'rxjs/operators';
+import { throwError, BehaviorSubject, Subject } from 'rxjs';
+import { catchError, tap, map, scan } from 'rxjs/operators';
 
 import { Product } from './product';
 import { SupplierService } from '../suppliers/supplier.service';
 import { ProductCategoryService } from '../product-categories/product-category.service';
-import { combineLatest } from 'rxjs';
+import { combineLatest, merge } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -38,12 +38,41 @@ export class ProductService {
     )
   );
 
-  constructor(private http: HttpClient,
-              private supplierService: SupplierService,
-              private productCategoryService: ProductCategoryService) { }
+  private productSelectedSubject = new BehaviorSubject<number>(0);
+  productSelectedAction$ = this.productSelectedSubject.asObservable();
 
-  private fakeProduct() {
-    return {
+  selectedProduct$ = combineLatest([this.productsWithCategory$, this.productSelectedAction$])
+    .pipe(
+      map(([products, selectedProductId]) =>
+        products.find(product => product.id === selectedProductId)),
+      tap(product => console.log('Selected product: ', product)),
+      catchError(this.handleError)
+    );
+
+  private productInsertedSubject = new Subject<Product>();
+  productInsertedAction$ = this.productInsertedSubject.asObservable();
+
+  productsWithAdd$ = merge(
+    this.productsWithCategory$, this.productInsertedAction$)
+    .pipe(
+      scan((acc: Product[], value: Product) => [...acc, value])
+    );
+
+  constructor(private http: HttpClient,
+    private supplierService: SupplierService,
+    private productCategoryService: ProductCategoryService) { }
+
+  selectedProductChanged(selectedProductId: number) {
+    this.productSelectedSubject.next(selectedProductId);
+  }
+
+  addProduct(newProduct?: Product) {
+    newProduct = newProduct || this.fakeProduct();
+    this.productInsertedSubject.next(newProduct);
+  }
+
+   fakeProduct(): Product {
+    const fakeProduct: Product = {
       id: 42,
       productName: 'Another One',
       productCode: 'TBX-0042',
@@ -53,7 +82,10 @@ export class ProductService {
       category: 'Toolbox',
       quantityInStock: 30
     };
+    return fakeProduct;
   }
+
+
 
   private handleError(err: any) {
     // in a real world app, we may send the server to some remote logging infrastructure

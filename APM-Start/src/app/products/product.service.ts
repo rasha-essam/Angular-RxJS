@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 import { throwError, BehaviorSubject, Subject } from 'rxjs';
-import { catchError, tap, map, scan } from 'rxjs/operators';
+import { catchError, tap, map, scan, shareReplay } from 'rxjs/operators';
 
 import { Product } from './product';
 import { SupplierService } from '../suppliers/supplier.service';
@@ -35,7 +35,8 @@ export class ProductService {
         }) as Product
       );
     }
-    )
+    ),
+    shareReplay(1)
   );
 
   private productSelectedSubject = new BehaviorSubject<number>(0);
@@ -59,8 +60,8 @@ export class ProductService {
     );
 
   constructor(private http: HttpClient,
-    private supplierService: SupplierService,
-    private productCategoryService: ProductCategoryService) { }
+              private supplierService: SupplierService,
+              private productCategoryService: ProductCategoryService) { }
 
   selectedProductChanged(selectedProductId: number) {
     this.productSelectedSubject.next(selectedProductId);

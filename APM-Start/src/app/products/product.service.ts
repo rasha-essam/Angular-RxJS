@@ -1,13 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
-import { throwError, BehaviorSubject, Subject } from 'rxjs';
-import { catchError, tap, map, scan, shareReplay } from 'rxjs/operators';
+import { throwError, BehaviorSubject, Subject, from } from 'rxjs';
+import { catchError, tap, map, scan, shareReplay, mergeMap, toArray, filter, switchMap } from 'rxjs/operators';
 
 import { Product } from './product';
 import { SupplierService } from '../suppliers/supplier.service';
 import { ProductCategoryService } from '../product-categories/product-category.service';
 import { combineLatest, merge } from 'rxjs';
+import { Supplier } from '../suppliers/supplier';
 
 @Injectable({
   providedIn: 'root'
@@ -59,6 +60,32 @@ export class ProductService {
       scan((acc: Product[], value: Product) => [...acc, value])
     );
 
+  /**
+   * @summary this is the "Get it all approach"
+   */
+  // selectedProductSuppliers$ = combineLatest([
+  //   this.selectedProduct$,
+  //   this.supplierService.suppliers$
+  // ]).pipe(
+  //   map(([selectedProduct, suppliers]) =>
+  //    suppliers.filter(supplier => selectedProduct.supplierIds.includes(supplier.id))
+  //   )
+  // );
+
+  selectedProductSuppliers$ = this.selectedProduct$
+    .pipe(
+      filter(selectedProduct => Boolean(selectedProduct)),
+      switchMap(selectedProduct =>
+        from(selectedProduct.supplierIds).pipe(
+          mergeMap(id =>
+            this.http.get<Supplier>(`${this.suppliersUrl}/${id}`)
+          ),
+          toArray(),
+          tap(suppliers => console.log('Product suppliers', JSON.stringify(suppliers)))
+        )
+      )
+    );
+
   constructor(private http: HttpClient,
               private supplierService: SupplierService,
               private productCategoryService: ProductCategoryService) { }
@@ -72,7 +99,7 @@ export class ProductService {
     this.productInsertedSubject.next(newProduct);
   }
 
-   fakeProduct(): Product {
+  fakeProduct(): Product {
     const fakeProduct: Product = {
       id: 42,
       productName: 'Another One',
